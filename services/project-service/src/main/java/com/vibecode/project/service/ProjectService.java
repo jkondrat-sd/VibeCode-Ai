@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import com.vibecode.project.dto.CreateProjectRequest;
 import com.vibecode.project.dto.ProjectFilesResponse;
+import com.vibecode.project.dto.ProjectVersionSummary;
 import com.vibecode.project.entity.Project;
 import com.vibecode.project.entity.ProjectFile;
 import com.vibecode.project.entity.ProjectVersion;
@@ -166,6 +167,99 @@ public class ProjectService {
         project.setUpdatedAt(now);
         return projectRepository.save(project);
 
+    }
+
+    public List<ProjectVersionSummary> getVersions(String projectId, UUID requesterId) {
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new RuntimeException("Project not found"));
+
+        // access control
+        boolean isOwner = project.getOwnerId().equals(requesterId);
+        boolean isPublic = "PUBLIC".equalsIgnoreCase(project.getVisibility());
+
+        if (!isOwner && !isPublic) {
+            throw new RuntimeException("Access denied");
+        }
+
+        return project.getVersions().stream()
+                .map(v -> ProjectVersionSummary.builder()
+                .versionNumber(v.getVersionNumber())
+                .message(v.getMessage())
+                .createdAt(v.getCreatedAt())
+                .build())
+                .toList();
+    }
+
+    public ProjectVersion getVersion(
+            String projectId,
+            int versionNumber,
+            UUID requesterId) {
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new RuntimeException("Project not found"));
+
+        boolean isOwner = project.getOwnerId().equals(requesterId);
+        boolean isPublic = "PUBLIC".equalsIgnoreCase(project.getVisibility());
+
+        if (!isOwner && !isPublic) {
+            throw new RuntimeException("Access denied");
+        }
+
+        return project.getVersions().stream()
+                .filter(v -> v.getVersionNumber() == versionNumber)
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Version not found"));
+    }
+
+    public Project rollbackToVersion(
+            String projectId,
+            int versionNumber,
+            UUID requesterId) {
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new RuntimeException("Project not found"));
+
+        if (!project.getOwnerId().equals(requesterId)) {
+            throw new RuntimeException("Only owner can rollback");
+        }
+
+        ProjectVersion targetVersion = project.getVersions().stream()
+                .filter(v -> v.getVersionNumber() == versionNumber)
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Version not found"));
+
+        LocalDateTime now = LocalDateTime.now();
+
+        // deep copy snapshot files
+        List<ProjectFile> restoredFiles = targetVersion.getFilesSnapshot()
+                .stream()
+                .map(file -> ProjectFile.builder()
+                .path(file.getPath())
+                .filename(file.getFilename())
+                .language(file.getLanguage())
+                .content(file.getContent())
+                .size(file.getSize())
+                .createdAt(now)
+                .updatedAt(now)
+                .build())
+                .toList();
+
+        project.setFiles(restoredFiles);
+
+        int nextVersion = project.getVersions().size() + 1;
+
+        ProjectVersion rollbackVersion = ProjectVersion.builder()
+                .versionNumber(nextVersion)
+                .message("Rollback to version " + versionNumber)
+                .filesSnapshot(restoredFiles)
+                .createdAt(now)
+                .build();
+
+        project.getVersions().add(rollbackVersion);
+        project.setUpdatedAt(now);
+
+        return projectRepository.save(project);
     }
 
 }

@@ -1,5 +1,6 @@
 package com.vibecode.project.controller;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.ResponseEntity;
@@ -15,8 +16,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.vibecode.project.dto.CreateProjectRequest;
 import com.vibecode.project.dto.ProjectFilesResponse;
+import com.vibecode.project.dto.ProjectVersionSummary;
 import com.vibecode.project.dto.UpdateProjectFilesRequest;
 import com.vibecode.project.entity.Project;
+import com.vibecode.project.entity.ProjectVersion;
 import com.vibecode.project.service.ProjectService;
 
 import jakarta.validation.Valid;
@@ -71,6 +74,44 @@ public class ProjectController {
                         request.getVersionMessage(),
                         requesterId
                 )
+        );
+    }
+
+    @GetMapping("/{projectId}/versions")
+    public ResponseEntity<List<ProjectVersionSummary>> getVersions(
+            @PathVariable String projectId,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        UUID requesterId = UUID.fromString(jwt.getSubject());
+
+        return ResponseEntity.ok(
+                projectService.getVersions(projectId, requesterId)
+        );
+    }
+
+    @GetMapping("/{projectId}/versions/{versionNumber}")
+    public ResponseEntity<ProjectVersion> getVersion(
+            @PathVariable String projectId,
+            @PathVariable int versionNumber,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        UUID requesterId = UUID.fromString(jwt.getSubject());
+
+        return ResponseEntity.ok(
+                projectService.getVersion(projectId, versionNumber, requesterId)
+        );
+    }
+
+    @PostMapping("/{projectId}/rollback/{versionNumber}")
+    public ResponseEntity<Project> rollback(
+            @PathVariable String projectId,
+            @PathVariable int versionNumber,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        UUID requesterId = UUID.fromString(jwt.getSubject());
+
+        return ResponseEntity.ok(
+                projectService.rollbackToVersion(projectId, versionNumber, requesterId)
         );
     }
 

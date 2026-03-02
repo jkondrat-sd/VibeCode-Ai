@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: billing-service
+  datasource:
+    url: jdbc:postgresql://localhost:5434/billing_db
+    username: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        "[format_sql]": true
+  cloud:
+    consul:
+      host: localhost
+      port: 8500
+      discovery:
+        service-name: billing-service
+        health-check-interval: 10s
+        health-check-timeout: 5s
+        health-check-retries: 3
+  kafka:
+    bootstrap-servers:
+      - localhost:9092
+    consumer:
+      group-id: billing-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      properties:
+        spring:
+          json:
+            trusted:
+              packages: "*"
+server:
+  port: 8086
